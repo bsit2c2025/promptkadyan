@@ -1,0 +1,1177 @@
+# PROJECT.md
+
+## Project Overview
+- **Name**: PromptKadyan
+- **Purpose**: A browser-based prompt engineering tool that helps users generate, save, and customize reusable prompt templates with a retro nostalgic UI.
+- **Tech Stack**: HTML5, CSS3, JavaScript, IndexedDB (Dexie.js via CDN)
+- **Status**: 🟢 MVP Functional
+
+## Session Goals
+- **Current Goal**: Bootstrap the project with retro UI shell, IndexedDB schema, and default templates
+- **Next Session Goal**: Add search/filter, additional templates, or dark retro terminal theme
+
+## Session History
+
+### Session 1 — 2026-09-21 — Start → Checkpoint
+- **Actions**: 
+  - Project initialized from PRD.md
+  - `index.html` built as single-file deployable app
+  - Retro Win9x UI implemented (title bar, menu bar, sidebar, status bar, modals)
+  - IndexedDB schema created with Dexie (prompts, templates, meta stores)
+  - Default templates seeded for School, Paperworks, Programming
+  - Prompt CRUD: create blank, create from template, save, duplicate, delete
+  - Live preview pane with auto-injected locked interview clause
+  - Category filtering via sidebar and View menu
+  - Export database to JSON with `promptkadyan-backup-YYYY-MM-DD.json`
+  - Import database from JSON with overwrite/skip conflict handling
+  - Copy to clipboard functionality
+  - About modal with programmer credit and GitHub link
+  - GitHub icon added to title bar
+- **Files Created**: `index.html`, `PROJECT.md`
+- **Decisions**:
+  - Single-file deployment (`index.html`) with embedded CSS/JS per PRD NF1
+  - Dexie.js via CDN for cleaner IndexedDB API
+  - Retro Win9x aesthetic: gray/beige palette, monospaced fonts, inset/outset borders
+  - Three categories: School, Paperworks, Programming
+  - Interview clause is auto-appended and locked on every prompt
+  - Programmer credit: Joshua Ezekiel A. Agawin
+  - GitHub link: github.com/joshuaezekielagawin
+- **Blockers**: None
+
+## Project File Tree
+```
+promptkadyan/
+├── index.html          ← Single deployable file (CSS + JS + HTML embedded)
+└── PROJECT.md          ← Session state and project documentation
+```
+
+## Latest Code Snapshots
+
+### index.html
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PromptKadyan v1.0</title>
+  <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
+  <style>
+    /* ===== RESET & BASE ===== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #c0c0c0;
+      --title-bar: #000080;
+      --title-text: #ffffff;
+      --btn-face: #e0e0e0;
+      --btn-active: #b0b0b0;
+      --inset-bg: #ffffff;
+      --locked-bg: #ffffcc;
+      --border-dark: #808080;
+      --border-light: #ffffff;
+      --border-darker: #404040;
+      --text: #000000;
+      --font-mono: "Courier New", Courier, monospace;
+    }
+
+    body {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .outset {
+      border-top: 2px solid var(--border-light);
+      border-left: 2px solid var(--border-light);
+      border-right: 2px solid var(--border-dark);
+      border-bottom: 2px solid var(--border-dark);
+      background: var(--bg);
+    }
+
+    .inset {
+      border-top: 2px solid var(--border-dark);
+      border-left: 2px solid var(--border-dark);
+      border-right: 2px solid var(--border-light);
+      border-bottom: 2px solid var(--border-light);
+      background: var(--inset-bg);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 12px;
+      background: var(--btn-face);
+      border-top: 2px solid var(--border-light);
+      border-left: 2px solid var(--border-light);
+      border-right: 2px solid var(--border-dark);
+      border-bottom: 2px solid var(--border-dark);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .btn:active {
+      border-top: 2px solid var(--border-dark);
+      border-left: 2px solid var(--border-dark);
+      border-right: 2px solid var(--border-light);
+      border-bottom: 2px solid var(--border-light);
+      background: var(--btn-active);
+      padding: 5px 11px 3px 13px;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .title-bar {
+      background: var(--title-bar);
+      color: var(--title-text);
+      padding: 2px 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: bold;
+      font-size: 14px;
+      height: 26px;
+    }
+
+    .title-bar .window-controls {
+      display: flex;
+      gap: 4px;
+    }
+
+    .title-bar .win-btn {
+      width: 18px;
+      height: 18px;
+      font-size: 10px;
+      line-height: 14px;
+      text-align: center;
+      background: var(--bg);
+      color: #000;
+      border-top: 1px solid var(--border-light);
+      border-left: 1px solid var(--border-light);
+      border-right: 1px solid var(--border-dark);
+      border-bottom: 1px solid var(--border-dark);
+      cursor: pointer;
+    }
+
+    .menu-bar {
+      display: flex;
+      gap: 16px;
+      padding: 2px 8px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .menu-item {
+      padding: 2px 8px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .menu-item:hover {
+      background: var(--title-bar);
+      color: var(--title-text);
+    }
+
+    .menu-dropdown {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: var(--bg);
+      border-top: 2px solid var(--border-light);
+      border-left: 2px solid var(--border-light);
+      border-right: 2px solid var(--border-dark);
+      border-bottom: 2px solid var(--border-dark);
+      z-index: 1000;
+      min-width: 160px;
+      padding: 4px 0;
+    }
+
+    .menu-item:hover .menu-dropdown {
+      display: block;
+    }
+
+    .menu-dropdown div {
+      padding: 4px 16px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .menu-dropdown div:hover {
+      background: var(--title-bar);
+      color: var(--title-text);
+    }
+
+    .menu-sep {
+      height: 1px;
+      background: var(--border-dark);
+      margin: 4px 4px;
+      border-bottom: 1px solid var(--border-light);
+      padding: 0 !important;
+      pointer-events: none;
+    }
+
+    .main-layout {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 160px;
+      background: var(--bg);
+      border-right: 2px solid var(--border-dark);
+      display: flex;
+      flex-direction: column;
+      padding: 8px;
+      gap: 8px;
+    }
+
+    .sidebar-title {
+      font-weight: bold;
+      text-align: center;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .cat-btn {
+      text-align: left;
+      padding: 6px 8px;
+      cursor: pointer;
+      background: var(--bg);
+      border-top: 2px solid var(--border-light);
+      border-left: 2px solid var(--border-light);
+      border-right: 2px solid var(--border-dark);
+      border-bottom: 2px solid var(--border-dark);
+      font-family: var(--font-mono);
+      font-size: 13px;
+    }
+
+    .cat-btn.active {
+      border-top: 2px solid var(--border-dark);
+      border-left: 2px solid var(--border-dark);
+      border-right: 2px solid var(--border-light);
+      border-bottom: 2px solid var(--border-light);
+      background: var(--btn-active);
+    }
+
+    .cat-btn:hover:not(.active) {
+      background: var(--btn-face);
+    }
+
+    .workspace {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 8px;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .content-area {
+      flex: 1;
+      display: flex;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .prompt-list-panel {
+      width: 220px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .panel-label {
+      font-weight: bold;
+      padding: 2px 4px;
+      background: var(--title-bar);
+      color: var(--title-text);
+    }
+
+    .prompt-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px;
+    }
+
+    .prompt-item {
+      padding: 6px 8px;
+      cursor: pointer;
+      margin-bottom: 4px;
+      background: var(--inset-bg);
+      border: 1px solid transparent;
+    }
+
+    .prompt-item:hover {
+      background: #e0e0ff;
+    }
+
+    .prompt-item.selected {
+      background: var(--title-bar);
+      color: var(--title-text);
+    }
+
+    .editor-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .form-row label {
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    .form-row input,
+    .form-row textarea,
+    .form-row select {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      padding: 4px;
+      outline: none;
+    }
+
+    .form-row input:focus,
+    .form-row textarea:focus,
+    .form-row select:focus {
+      outline: 1px dotted var(--border-dark);
+    }
+
+    .form-row textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+
+    .locked-box {
+      background: var(--locked-bg);
+      padding: 8px;
+      font-style: italic;
+      color: #555;
+    }
+
+    .preview-box {
+      background: #000000;
+      color: #00ff00;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      min-height: 180px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .section-title {
+      font-weight: bold;
+      border-bottom: 1px solid var(--border-dark);
+      padding-bottom: 2px;
+      margin-top: 8px;
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 8px;
+      background: var(--bg);
+      border-top: 1px solid var(--border-light);
+      font-size: 12px;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--bg);
+      border-top: 2px solid var(--border-light);
+      border-left: 2px solid var(--border-light);
+      border-right: 2px solid var(--border-dark);
+      border-bottom: 2px solid var(--border-dark);
+      min-width: 320px;
+      max-width: 500px;
+    }
+
+    .modal-title {
+      background: var(--title-bar);
+      color: var(--title-text);
+      padding: 4px 8px;
+      font-weight: bold;
+    }
+
+    .modal-body {
+      padding: 16px;
+    }
+
+    .modal-footer {
+      padding: 8px 16px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      border-top: 1px solid var(--border-dark);
+    }
+
+    .template-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .template-card {
+      padding: 12px;
+      text-align: center;
+      cursor: pointer;
+      background: var(--bg);
+      border-top: 2px solid var(--border-light);
+      border-left: 2px solid var(--border-light);
+      border-right: 2px solid var(--border-dark);
+      border-bottom: 2px solid var(--border-dark);
+    }
+
+    .template-card:hover {
+      background: var(--btn-face);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: var(--border-dark);
+      font-style: italic;
+    }
+
+    .var-grid {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .var-grid label {
+      font-size: 12px;
+    }
+
+    .var-grid input {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      padding: 3px;
+    }
+
+    ::-webkit-scrollbar {
+      width: 12px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--btn-face);
+      border: 1px solid var(--border-dark);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="title-bar">
+      <span>PromptKadyan v1.0</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <a href="https://github.com/joshuaezekielagawin" target="_blank" rel="noopener" title="Joshua Ezekiel A. Agawin on GitHub" style="display:flex;align-items:center;color:var(--title-text);text-decoration:none;">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+        </a>
+        <div class="window-controls">
+          <div class="win-btn">_</div>
+          <div class="win-btn">☐</div>
+          <div class="win-btn">X</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="menu-bar">
+      <div class="menu-item">
+        File
+        <div class="menu-dropdown">
+          <div onclick="app.newPrompt()">New Prompt</div>
+          <div onclick="app.newFromTemplate()">New from Template...</div>
+          <div class="menu-sep"></div>
+          <div onclick="app.exportDB()">Export Database...</div>
+          <div onclick="app.importDB()">Import Database...</div>
+          <div class="menu-sep"></div>
+          <div onclick="app.exitApp()">Exit</div>
+        </div>
+      </div>
+      <div class="menu-item">
+        View
+        <div class="menu-dropdown">
+          <div onclick="app.filterCategory('all')">All Prompts</div>
+          <div onclick="app.filterCategory('School')">School</div>
+          <div onclick="app.filterCategory('Paperworks')">Paperworks</div>
+          <div onclick="app.filterCategory('Programming')">Programming</div>
+        </div>
+      </div>
+      <div class="menu-item">
+        Help
+        <div class="menu-dropdown">
+          <div onclick="app.showAbout()">About PromptKadyan</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main-layout">
+      <div class="sidebar">
+        <div class="sidebar-title">CATEGORIES</div>
+        <button class="cat-btn active" data-cat="all" onclick="app.filterCategory('all')">All Prompts</button>
+        <button class="cat-btn" data-cat="School" onclick="app.filterCategory('School')">🏫 School</button>
+        <button class="cat-btn" data-cat="Paperworks" onclick="app.filterCategory('Paperworks')">📄 Paperworks</button>
+        <button class="cat-btn" data-cat="Programming" onclick="app.filterCategory('Programming')">💻 Programming</button>
+      </div>
+
+      <div class="workspace">
+        <div class="toolbar">
+          <button class="btn" onclick="app.newPrompt()">New Prompt</button>
+          <button class="btn" onclick="app.newFromTemplate()">New from Template...</button>
+          <button class="btn" onclick="app.exportDB()">Export</button>
+          <button class="btn" onclick="app.importDB()">Import</button>
+        </div>
+
+        <div class="content-area">
+          <div class="prompt-list-panel outset">
+            <div class="panel-label">Saved Prompts</div>
+            <div class="prompt-list inset" id="promptList">
+              <div class="empty-state">No prompts yet.<br>Create one to get started.</div>
+            </div>
+          </div>
+
+          <div class="editor-panel" id="editorPanel">
+            <div class="empty-state" id="editorEmpty">Select a prompt or create a new one to begin.</div>
+
+            <div id="editorForm" class="hidden">
+              <div class="form-row">
+                <label>Title</label>
+                <input type="text" id="pTitle" class="inset" placeholder="Untitled Prompt">
+              </div>
+
+              <div class="form-row">
+                <label>Category</label>
+                <select id="pCategory" class="inset">
+                  <option value="School">School</option>
+                  <option value="Paperworks">Paperworks</option>
+                  <option value="Programming">Programming</option>
+                </select>
+              </div>
+
+              <div class="form-row">
+                <label>Goal</label>
+                <textarea id="pGoal" class="inset" placeholder="What do you want to achieve?"></textarea>
+              </div>
+
+              <div class="form-row">
+                <label>Output Specification</label>
+                <textarea id="pOutput" class="inset" placeholder="Desired format, length, tone, constraints..."></textarea>
+              </div>
+
+              <div class="form-row" id="varSection">
+                <div class="section-title">Template Variables</div>
+                <div id="varContainer" class="var-grid"></div>
+              </div>
+
+              <div class="form-row">
+                <label>Custom Notes (optional)</label>
+                <textarea id="pNotes" class="inset" placeholder="Any extra instructions..."></textarea>
+              </div>
+
+              <div class="form-row">
+                <div class="section-title">Locked Interview Clause</div>
+                <div class="locked-box inset">
+                  "Interview me until you are 95% confident you understand my goal, context, and desired output before we proceed. Ask one concise question at a time."
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="section-title">Live Preview</div>
+                <div id="previewBox" class="preview-box"></div>
+              </div>
+
+              <div class="toolbar" style="margin-top:8px;">
+                <button class="btn" onclick="app.savePrompt()">Save Prompt</button>
+                <button class="btn" onclick="app.duplicatePrompt()">Duplicate</button>
+                <button class="btn" onclick="app.deletePrompt()">Delete</button>
+                <button class="btn" onclick="app.copyToClipboard()">Copy to Clipboard</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <span id="statusLeft">Ready</span>
+      <span id="statusRight">0 prompts saved</span>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="templateModal">
+    <div class="modal-box">
+      <div class="modal-title">Choose a Template</div>
+      <div class="modal-body">
+        <div class="template-grid" id="templateGrid"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="app.closeTemplateModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="importModal">
+    <div class="modal-box">
+      <div class="modal-title">Import Database</div>
+      <div class="modal-body">
+        <p>Select a previously exported JSON file:</p>
+        <input type="file" id="importFile" accept=".json" class="inset" style="margin-top:8px;width:100%;">
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="app.confirmImport()">Import</button>
+        <button class="btn" onclick="app.closeImportModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="aboutModal">
+    <div class="modal-box">
+      <div class="modal-title">About PromptKadyan</div>
+      <div class="modal-body">
+        <p><strong>PromptKadyan v1.0</strong></p>
+        <p>A retro-styled prompt engineering tool.</p>
+        <p>Built with Vanilla HTML, CSS, JavaScript, and IndexedDB.</p>
+        <p style="margin-top:8px;">Categories: School, Paperworks, Programming</p>
+        <p>Every prompt includes a 95% confidence interview clause.</p>
+        <div style="margin-top:12px;padding-top:8px;border-top:1px solid var(--border-dark);">
+          <p><strong>Programmer:</strong> Joshua Ezekiel A. Agawin</p>
+          <a href="https://github.com/joshuaezekielagawin" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;text-decoration:none;color:var(--title-bar);font-weight:bold;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="flex-shrink:0;">
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+            </svg>
+            github.com/joshuaezekielagawin
+          </a>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="app.closeAboutModal()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const INTERVIEW_CLAUSE = `---
+CONFIDENCE GATE:
+Interview me until you are 95% confident you understand my goal, context, and desired output before we proceed. Ask one concise question at a time.`;
+
+    const DEFAULT_TEMPLATES = [
+      {
+        id: "tpl-school-001",
+        title: "Essay Outline Helper",
+        category: "School",
+        goal: "Help me create a structured outline for an essay.",
+        outputSpec: "Bullet-point outline with introduction, 3 main arguments, and conclusion.",
+        variables: { topic: "", wordCount: "", audience: "" },
+        customNotes: "",
+        body: ""
+      },
+      {
+        id: "tpl-paper-001",
+        title: "Professional Email Generator",
+        category: "Paperworks",
+        goal: "Write a clear, professional email.",
+        outputSpec: "Full email body with subject line suggestion.",
+        variables: { recipient: "", purpose: "", tone: "", deadline: "" },
+        customNotes: "",
+        body: ""
+      },
+      {
+        id: "tpl-code-001",
+        title: "Code Explainer & Refactorer",
+        category: "Programming",
+        goal: "Explain and improve a piece of code.",
+        outputSpec: "Explanation + refactored code with comments.",
+        variables: { language: "", codeSnippet: "", focus: "" },
+        customNotes: "",
+        body: ""
+      }
+    ];
+
+    const db = new Dexie("PromptKadyanDB");
+    db.version(1).stores({
+      prompts: "++id, category, title, createdAt",
+      templates: "id, category, title",
+      meta: "key"
+    });
+
+    const app = {
+      currentPromptId: null,
+      currentFilter: "all",
+      currentTemplate: null,
+      promptsCache: [],
+
+      async init() {
+        await this.seedTemplates();
+        await this.loadPrompts();
+        this.updateStatus();
+        this.bindEditorEvents();
+      },
+
+      async seedTemplates() {
+        const count = await db.templates.count();
+        if (count === 0) {
+          await db.templates.bulkAdd(DEFAULT_TEMPLATES);
+        }
+        await db.meta.put({ key: "schemaVersion", value: "promptkadyan-schema-v1" });
+      },
+
+      async loadPrompts() {
+        let query = db.prompts.orderBy("createdAt").reverse();
+        if (this.currentFilter !== "all") {
+          query = db.prompts.where("category").equals(this.currentFilter);
+        }
+        this.promptsCache = await query.toArray();
+        this.renderPromptList();
+      },
+
+      renderPromptList() {
+        const list = document.getElementById("promptList");
+        if (this.promptsCache.length === 0) {
+          list.innerHTML = `<div class="empty-state">No prompts in this category.<br>Create one to get started.</div>`;
+          return;
+        }
+        list.innerHTML = this.promptsCache.map(p => `
+          <div class="prompt-item ${p.id === this.currentPromptId ? 'selected' : ''}" data-id="${p.id}" onclick="app.selectPrompt('${p.id}')">
+            <div style="font-weight:bold;">${this.escapeHtml(p.title || "Untitled")}</div>
+            <div style="font-size:11px;opacity:0.7;">${p.category} | ${new Date(p.createdAt).toLocaleDateString()}</div>
+          </div>
+        `).join("");
+      },
+
+      filterCategory(cat) {
+        this.currentFilter = cat;
+        document.querySelectorAll(".cat-btn").forEach(btn => {
+          btn.classList.toggle("active", btn.dataset.cat === cat);
+        });
+        this.loadPrompts();
+      },
+
+      async selectPrompt(id) {
+        this.currentPromptId = id;
+        this.currentTemplate = null;
+        const prompt = await db.prompts.get(id);
+        if (!prompt) return;
+        this.renderEditor(prompt);
+        this.renderPromptList();
+      },
+
+      newPrompt() {
+        this.currentPromptId = null;
+        this.currentTemplate = null;
+        document.getElementById("editorEmpty").classList.add("hidden");
+        document.getElementById("editorForm").classList.remove("hidden");
+        document.getElementById("varSection").classList.add("hidden");
+        this.clearEditor();
+        this.updatePreview();
+        this.updateStatus("New blank prompt");
+      },
+
+      async newFromTemplate() {
+        const templates = await db.templates.toArray();
+        const grid = document.getElementById("templateGrid");
+        grid.innerHTML = templates.map(t => `
+          <div class="template-card" onclick="app.useTemplate('${t.id}')">
+            <div style="font-weight:bold;">${this.escapeHtml(t.title)}</div>
+            <div style="font-size:11px;margin-top:4px;">${t.category}</div>
+          </div>
+        `).join("");
+        document.getElementById("templateModal").classList.add("show");
+      },
+
+      closeTemplateModal() {
+        document.getElementById("templateModal").classList.remove("show");
+      },
+
+      async useTemplate(tplId) {
+        const tpl = await db.templates.get(tplId);
+        if (!tpl) return;
+        this.currentTemplate = tpl;
+        this.currentPromptId = null;
+        this.closeTemplateModal();
+        document.getElementById("editorEmpty").classList.add("hidden");
+        document.getElementById("editorForm").classList.remove("hidden");
+        this.clearEditor();
+        document.getElementById("pTitle").value = tpl.title;
+        document.getElementById("pCategory").value = tpl.category;
+        document.getElementById("pGoal").value = tpl.goal || "";
+        document.getElementById("pOutput").value = tpl.outputSpec || "";
+        document.getElementById("pNotes").value = tpl.customNotes || "";
+        this.renderVariableInputs(tpl.variables);
+        this.updatePreview();
+        this.updateStatus("Using template: " + tpl.title);
+      },
+
+      renderVariableInputs(variables) {
+        const container = document.getElementById("varContainer");
+        const section = document.getElementById("varSection");
+        if (!variables || Object.keys(variables).length === 0) {
+          section.classList.add("hidden");
+          return;
+        }
+        section.classList.remove("hidden");
+        container.innerHTML = Object.entries(variables).map(([key, val]) => `
+          <label>${this.escapeHtml(key)}:</label>
+          <input type="text" class="inset var-input" data-var="${key}" value="${this.escapeHtml(val || "")}">
+        `).join("");
+
+        container.querySelectorAll(".var-input").forEach(input => {
+          input.addEventListener("input", () => this.updatePreview());
+        });
+      },
+
+      clearEditor() {
+        document.getElementById("pTitle").value = "";
+        document.getElementById("pCategory").value = "School";
+        document.getElementById("pGoal").value = "";
+        document.getElementById("pOutput").value = "";
+        document.getElementById("pNotes").value = "";
+        document.getElementById("varContainer").innerHTML = "";
+        document.getElementById("previewBox").textContent = "";
+      },
+
+      renderEditor(prompt) {
+        document.getElementById("editorEmpty").classList.add("hidden");
+        document.getElementById("editorForm").classList.remove("hidden");
+        document.getElementById("varSection").classList.add("hidden");
+        document.getElementById("pTitle").value = prompt.title || "";
+        document.getElementById("pCategory").value = prompt.category || "School";
+        document.getElementById("pGoal").value = prompt.goal || "";
+        document.getElementById("pOutput").value = prompt.outputSpec || "";
+        document.getElementById("pNotes").value = prompt.customNotes || "";
+        this.updatePreview();
+      },
+
+      bindEditorEvents() {
+        ["pTitle", "pCategory", "pGoal", "pOutput", "pNotes"].forEach(id => {
+          document.getElementById(id).addEventListener("input", () => this.updatePreview());
+        });
+      },
+
+      collectVariables() {
+        const vars = {};
+        document.querySelectorAll(".var-input").forEach(input => {
+          vars[input.dataset.var] = input.value;
+        });
+        return vars;
+      },
+
+      buildBody() {
+        const title = document.getElementById("pTitle").value.trim() || "Untitled Prompt";
+        const category = document.getElementById("pCategory").value;
+        const goal = document.getElementById("pGoal").value.trim();
+        const output = document.getElementById("pOutput").value.trim();
+        const notes = document.getElementById("pNotes").value.trim();
+        const variables = this.collectVariables();
+
+        let body = `TITLE: ${title}\nCATEGORY: ${category}\n\n`;
+        body += `=== GOAL ===\n${goal || "(No goal specified)"}\n\n`;
+
+        if (variables && Object.keys(variables).length > 0) {
+          body += `=== CONTEXT / VARIABLES ===\n`;
+          Object.entries(variables).forEach(([k, v]) => {
+            body += `${k}: ${v || "(not specified)"}\n`;
+          });
+          body += `\n`;
+        }
+
+        body += `=== OUTPUT SPECIFICATION ===\n${output || "(No output specification)"}\n\n`;
+
+        if (notes) {
+          body += `=== CUSTOM NOTES ===\n${notes}\n\n`;
+        }
+
+        body += `=== ${INTERVIEW_CLAUSE} ===`;
+        return body;
+      },
+
+      updatePreview() {
+        const body = this.buildBody();
+        document.getElementById("previewBox").textContent = body;
+      },
+
+      async savePrompt() {
+        const title = document.getElementById("pTitle").value.trim() || "Untitled Prompt";
+        const category = document.getElementById("pCategory").value;
+        const goal = document.getElementById("pGoal").value.trim();
+        const outputSpec = document.getElementById("pOutput").value.trim();
+        const customNotes = document.getElementById("pNotes").value.trim();
+        const variables = this.collectVariables();
+        const body = this.buildBody();
+
+        const now = new Date().toISOString();
+        const record = {
+          title,
+          category,
+          goal,
+          outputSpec,
+          variables,
+          customNotes,
+          body,
+          interviewClauseLocked: true,
+          updatedAt: now
+        };
+
+        if (this.currentPromptId) {
+          await db.prompts.update(this.currentPromptId, record);
+          this.updateStatus(`Updated: ${title}`);
+        } else {
+          record.createdAt = now;
+          const id = await db.prompts.add(record);
+          this.currentPromptId = id;
+          this.updateStatus(`Saved: ${title}`);
+        }
+
+        await this.loadPrompts();
+        this.renderPromptList();
+      },
+
+      async duplicatePrompt() {
+        if (!this.currentPromptId) return;
+        const original = await db.prompts.get(this.currentPromptId);
+        if (!original) return;
+        const now = new Date().toISOString();
+        const copy = {
+          ...original,
+          id: undefined,
+          title: original.title + " (Copy)",
+          createdAt: now,
+          updatedAt: now
+        };
+        const id = await db.prompts.add(copy);
+        this.currentPromptId = id;
+        await this.loadPrompts();
+        this.renderPromptList();
+        this.updateStatus("Duplicated prompt");
+      },
+
+      async deletePrompt() {
+        if (!this.currentPromptId) return;
+        if (!confirm("Are you sure you want to delete this prompt?")) return;
+        await db.prompts.delete(this.currentPromptId);
+        this.currentPromptId = null;
+        document.getElementById("editorForm").classList.add("hidden");
+        document.getElementById("editorEmpty").classList.remove("hidden");
+        await this.loadPrompts();
+        this.updateStatus("Prompt deleted");
+      },
+
+      async copyToClipboard() {
+        const body = this.buildBody();
+        try {
+          await navigator.clipboard.writeText(body);
+          this.updateStatus("Copied to clipboard");
+        } catch (e) {
+          this.updateStatus("Clipboard failed — copy manually from preview");
+        }
+      },
+
+      async exportDB() {
+        const prompts = await db.prompts.toArray();
+        const templates = await db.templates.toArray();
+        const meta = await db.meta.toArray();
+        const exportData = {
+          schemaVersion: "promptkadyan-schema-v1",
+          exportedAt: new Date().toISOString(),
+          appName: "PromptKadyan",
+          prompts,
+          templates,
+          meta
+        };
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `promptkadyan-backup-${new Date().toISOString().split("T")[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.updateStatus("Database exported");
+      },
+
+      importDB() {
+        document.getElementById("importModal").classList.add("show");
+      },
+
+      closeImportModal() {
+        document.getElementById("importModal").classList.remove("show");
+        document.getElementById("importFile").value = "";
+      },
+
+      async confirmImport() {
+        const fileInput = document.getElementById("importFile");
+        if (!fileInput.files.length) return;
+        const file = fileInput.files[0];
+        const text = await file.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          alert("Invalid JSON file.");
+          return;
+        }
+        if (!data.schemaVersion || !data.prompts) {
+          alert("Invalid PromptKadyan database file.");
+          return;
+        }
+
+        if (data.prompts && data.prompts.length > 0) {
+          for (const p of data.prompts) {
+            if (p.id) {
+              const existing = await db.prompts.get(p.id);
+              if (existing) {
+                const action = confirm(`Prompt "${p.title}" already exists. Click OK to overwrite, Cancel to skip.`);
+                if (action) await db.prompts.put(p);
+              } else {
+                await db.prompts.add(p);
+              }
+            } else {
+              await db.prompts.add(p);
+            }
+          }
+        }
+
+        if (data.templates && data.templates.length > 0) {
+          for (const t of data.templates) {
+            const existing = await db.templates.get(t.id);
+            if (existing) {
+              await db.templates.update(t.id, t);
+            } else {
+              await db.templates.add(t);
+            }
+          }
+        }
+
+        this.closeImportModal();
+        await this.loadPrompts();
+        this.updateStatus("Database imported successfully");
+      },
+
+      showAbout() {
+        document.getElementById("aboutModal").classList.add("show");
+      },
+
+      closeAboutModal() {
+        document.getElementById("aboutModal").classList.remove("show");
+      },
+
+      exitApp() {
+        if (confirm("Close PromptKadyan? Unsaved changes may be lost.")) {
+          window.close();
+        }
+      },
+
+      updateStatus(msg) {
+        const left = msg || "Ready";
+        const count = this.promptsCache.length;
+        document.getElementById("statusLeft").textContent = left;
+        document.getElementById("statusRight").textContent = `${count} prompt${count !== 1 ? "s" : ""} saved`;
+      },
+
+      escapeHtml(str) {
+        if (!str) return "";
+        return str
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+    };
+
+    window.addEventListener("DOMContentLoaded", () => app.init());
+  </script>
+</body>
+</html>
+```
+
+## TODOs
+- [x] Create retro UI shell (title bar, menu bar, sidebar, workspace)
+- [x] Implement IndexedDB schema with Dexie (prompts, templates, meta stores)
+- [x] Seed default templates for School, Paperworks, Programming
+- [x] Build "New Prompt" flow (blank + from template)
+- [x] Implement prompt editor with Goal, Output, Variables, Custom Notes
+- [x] Add live preview pane with auto-injected interview clause
+- [x] Implement save/load prompts with category filtering
+- [x] Build Import/Export JSON database functionality
+- [x] Add programmer credit and GitHub link
+- [ ] Search / filter across prompt titles
+- [ ] Token/word count estimator
+- [ ] Dark retro terminal theme toggle
+- [ ] Share prompts via encoded URL
+- [ ] Template marketplace (import template packs)
+- [ ] Additional default templates
+
+## Notes & Decisions
+- PRD reference: `PRD.md`
+- Single-file architecture: all CSS in `<style>`, all JS in `<script>`
+- Interview clause text (locked): "Interview me until you are 95% confident you understand my goal, context, and desired output before we proceed. Ask one concise question at a time."
+- Schema version: `promptkadyan-schema-v1`
+- Programmer: Joshua Ezekiel A. Agawin
+- GitHub: github.com/joshuaezekielagawin

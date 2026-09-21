@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PromptKadyan v1.0</title>
+  <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Title Bar -->
+    <div class="title-bar">
+      <span>PromptKadyan v1.0</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <a href="https://github.com/joshuaezekielagawin" target="_blank" rel="noopener" title="Joshua Ezekiel A. Agawin on GitHub" style="display:flex;align-items:center;color:var(--title-text);text-decoration:none;">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+        </a>
+        <div class="window-controls">
+          <div class="win-btn">_</div>
+          <div class="win-btn">☐</div>
+          <div class="win-btn">X</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Menu Bar -->
+    <div class="menu-bar">
+      <div class="menu-item">
+        File
+        <div class="menu-dropdown">
+          <div onclick="app.newPrompt()">New Prompt</div>
+          <div onclick="app.newFromTemplate()">New from Template...</div>
+          <div class="menu-sep"></div>
+          <div onclick="app.exportDB()">Export Database...</div>
+          <div onclick="app.importDB()">Import Database...</div>
+          <div class="menu-sep"></div>
+          <div onclick="app.exitApp()">Exit</div>
+        </div>
+      </div>
+      <div class="menu-item">
+        View
+        <div class="menu-dropdown">
+          <div onclick="app.filterCategory('all')">All Prompts</div>
+          <div onclick="app.filterCategory('School')">School</div>
+          <div onclick="app.filterCategory('Paperworks')">Paperworks</div>
+          <div onclick="app.filterCategory('Programming')">Programming</div>
+        </div>
+      </div>
+      <div class="menu-item">
+        Help
+        <div class="menu-dropdown">
+          <div onclick="app.showAbout()">About PromptKadyan</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="main-layout">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-title">CATEGORIES</div>
+        <button class="cat-btn active" data-cat="all" onclick="app.filterCategory('all')">All Prompts</button>
+        <button class="cat-btn" data-cat="School" onclick="app.filterCategory('School')">🏫 School</button>
+        <button class="cat-btn" data-cat="Paperworks" onclick="app.filterCategory('Paperworks')">📄 Paperworks</button>
+        <button class="cat-btn" data-cat="Programming" onclick="app.filterCategory('Programming')">💻 Programming</button>
+      </div>
+
+      <!-- Workspace -->
+      <div class="workspace">
+        <div class="toolbar">
+          <button class="btn" onclick="app.newPrompt()">New Prompt</button>
+          <button class="btn" onclick="app.newFromTemplate()">New from Template...</button>
+          <button class="btn" onclick="app.exportDB()">Export</button>
+          <button class="btn" onclick="app.importDB()">Import</button>
+        </div>
+
+        <div class="content-area">
+          <!-- Prompt List -->
+          <div class="prompt-list-panel outset">
+            <div class="panel-label">Saved Prompts</div>
+            <div class="prompt-list inset" id="promptList">
+              <div class="empty-state">No prompts yet.<br>Create one to get started.</div>
+            </div>
+          </div>
+
+          <!-- Editor -->
+          <div class="editor-panel" id="editorPanel">
+            <div class="empty-state" id="editorEmpty">Select a prompt or create a new one to begin.</div>
+
+            <div id="editorForm" class="hidden">
+              <div class="form-row">
+                <label>Title</label>
+                <input type="text" id="pTitle" class="inset" placeholder="Untitled Prompt">
+              </div>
+
+              <div class="form-row">
+                <label>Category</label>
+                <select id="pCategory" class="inset">
+                  <option value="School">School</option>
+                  <option value="Paperworks">Paperworks</option>
+                  <option value="Programming">Programming</option>
+                </select>
+              </div>
+
+              <div class="form-row">
+                <label>Goal</label>
+                <textarea id="pGoal" class="inset" placeholder="What do you want to achieve?"></textarea>
+              </div>
+
+              <div class="form-row">
+                <label>Output Specification</label>
+                <textarea id="pOutput" class="inset" placeholder="Desired format, length, tone, constraints..."></textarea>
+              </div>
+
+              <div class="form-row" id="varSection">
+                <div class="section-title">Template Variables</div>
+                <div id="varContainer" class="var-grid"></div>
+              </div>
+
+              <div class="form-row">
+                <label>Custom Notes (optional)</label>
+                <textarea id="pNotes" class="inset" placeholder="Any extra instructions..."></textarea>
+              </div>
+
+              <div class="form-row">
+                <div class="section-title">Locked Interview Clause</div>
+                <div class="locked-box inset">
+                  "Interview me until you are 95% confident you understand my goal, context, and desired output before we proceed. Ask one concise question at a time."
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="section-title">Live Preview</div>
+                <div id="previewBox" class="preview-box"></div>
+              </div>
+
+              <div class="toolbar" style="margin-top:8px;">
+                <button class="btn" onclick="app.savePrompt()">Save Prompt</button>
+                <button class="btn" onclick="app.duplicatePrompt()">Duplicate</button>
+                <button class="btn" onclick="app.deletePrompt()">Delete</button>
+                <button class="btn" onclick="app.copyToClipboard()">Copy to Clipboard</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span id="statusLeft">Ready</span>
+      <span id="statusRight">0 prompts saved</span>
+    </div>
+  </div>
+
+  <!-- Template Picker Modal -->
+  <div class="modal-overlay" id="templateModal">
+    <div class="modal-box">
+      <div class="modal-title">Choose a Template</div>
+      <div class="modal-body">
+        <div class="template-grid" id="templateGrid"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="app.closeTemplateModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Modal -->
+  <div class="modal-overlay" id="importModal">
+    <div class="modal-box">
+      <div class="modal-title">Import Database</div>
+      <div class="modal-body">
+        <p>Select a previously exported JSON file:</p>
+        <input type="file" id="importFile" accept=".json" class="inset" style="margin-top:8px;width:100%;">
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="app.confirmImport()">Import</button>
+        <button class="btn" onclick="app.closeImportModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- About Modal -->
+  <div class="modal-overlay" id="aboutModal">
+    <div class="modal-box">
+      <div class="modal-title">About PromptKadyan</div>
+      <div class="modal-body">
+        <p><strong>PromptKadyan v1.0</strong></p>
+        <p>A retro-styled prompt engineering tool.</p>
+        <p>Built with Vanilla HTML, CSS, JavaScript, and IndexedDB.</p>
+        <p style="margin-top:8px;">Categories: School, Paperworks, Programming</p>
+        <p>Every prompt includes a 95% confidence interview clause.</p>
+        <div style="margin-top:12px;padding-top:8px;border-top:1px solid var(--border-dark);">
+          <p><strong>Programmer:</strong> Joshua Ezekiel A. Agawin</p>
+          <a href="https://github.com/joshuaezekielagawin" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;text-decoration:none;color:var(--title-bar);font-weight:bold;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="flex-shrink:0;">
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+            </svg>
+            github.com/joshuaezekielagawin
+          </a>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="app.closeAboutModal()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/db.js"></script>
+  <script src="js/templates.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
