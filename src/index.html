@@ -5,11 +5,540 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PromptKadyan v1.0</title>
   <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
-  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ===== RESET & BASE ===== */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #c0c0c0;
+      --title-bar: #000080;
+      --title-text: #ffffff;
+      --btn-face: #e0e0e0;
+      --btn-active: #b0b0b0;
+      --inset-bg: #ffffff;
+      --locked-bg: #ffffcc;
+      --border-dark: #808080;
+      --border-light: #ffffff;
+      --border-darker: #404040;
+      --text: #000000;
+      --font-mono: "Courier New", Courier, monospace;
+    }
+
+    body {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .outset {
+      border-top: 2px solid var(--border-light);
+      border-left: 2px solid var(--border-light);
+      border-right: 2px solid var(--border-dark);
+      border-bottom: 2px solid var(--border-dark);
+      background: var(--bg);
+    }
+
+    .inset {
+      border-top: 2px solid var(--border-dark);
+      border-left: 2px solid var(--border-dark);
+      border-right: 2px solid var(--border-light);
+      border-bottom: 2px solid var(--border-light);
+      background: var(--inset-bg);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 12px;
+      background: var(--btn-face);
+      border-top: 2px solid var(--border-light);
+      border-left: 2px solid var(--border-light);
+      border-right: 2px solid var(--border-dark);
+      border-bottom: 2px solid var(--border-dark);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .btn:active {
+      border-top: 2px solid var(--border-dark);
+      border-left: 2px solid var(--border-dark);
+      border-right: 2px solid var(--border-light);
+      border-bottom: 2px solid var(--border-light);
+      background: var(--btn-active);
+      padding: 5px 11px 3px 13px;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .title-bar {
+      background: var(--title-bar);
+      color: var(--title-text);
+      padding: 2px 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: bold;
+      font-size: 14px;
+      height: 26px;
+    }
+
+    .title-bar .window-controls {
+      display: flex;
+      gap: 4px;
+    }
+
+    .title-bar .win-btn {
+      width: 18px;
+      height: 18px;
+      font-size: 10px;
+      line-height: 14px;
+      text-align: center;
+      background: var(--bg);
+      color: #000;
+      border-top: 1px solid var(--border-light);
+      border-left: 1px solid var(--border-light);
+      border-right: 1px solid var(--border-dark);
+      border-bottom: 1px solid var(--border-dark);
+      cursor: pointer;
+    }
+
+    .menu-bar {
+      display: flex;
+      gap: 16px;
+      padding: 2px 8px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .menu-item {
+      padding: 2px 8px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .menu-item:hover {
+      background: var(--title-bar);
+      color: var(--title-text);
+    }
+
+    .menu-dropdown {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: var(--bg);
+      border-top: 2px solid var(--border-light);
+      border-left: 2px solid var(--border-light);
+      border-right: 2px solid var(--border-dark);
+      border-bottom: 2px solid var(--border-dark);
+      z-index: 1000;
+      min-width: 160px;
+      padding: 4px 0;
+    }
+
+    .menu-item:hover .menu-dropdown {
+      display: block;
+    }
+
+    .menu-dropdown div {
+      padding: 4px 16px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .menu-dropdown div:hover {
+      background: var(--title-bar);
+      color: var(--title-text);
+    }
+
+    .menu-sep {
+      height: 1px;
+      background: var(--border-dark);
+      margin: 4px 4px;
+      border-bottom: 1px solid var(--border-light);
+      padding: 0 !important;
+      pointer-events: none;
+    }
+
+    .main-layout {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 160px;
+      background: var(--bg);
+      border-right: 2px solid var(--border-dark);
+      display: flex;
+      flex-direction: column;
+      padding: 8px;
+      gap: 8px;
+    }
+
+    .sidebar-title {
+      font-weight: bold;
+      text-align: center;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .cat-btn {
+      text-align: left;
+      padding: 6px 8px;
+      cursor: pointer;
+      background: var(--bg);
+      border-top: 2px solid var(--border-light);
+      border-left: 2px solid var(--border-light);
+      border-right: 2px solid var(--border-dark);
+      border-bottom: 2px solid var(--border-dark);
+      font-family: var(--font-mono);
+      font-size: 13px;
+    }
+
+    .cat-btn.active {
+      border-top: 2px solid var(--border-dark);
+      border-left: 2px solid var(--border-dark);
+      border-right: 2px solid var(--border-light);
+      border-bottom: 2px solid var(--border-light);
+      background: var(--btn-active);
+    }
+
+    .cat-btn:hover:not(.active) {
+      background: var(--btn-face);
+    }
+
+    .workspace {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 8px;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .content-area {
+      flex: 1;
+      display: flex;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .prompt-list-panel {
+      width: 220px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .panel-label {
+      font-weight: bold;
+      padding: 2px 4px;
+      background: var(--title-bar);
+      color: var(--title-text);
+    }
+
+    .prompt-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px;
+    }
+
+    .prompt-item {
+      padding: 6px 8px;
+      cursor: pointer;
+      margin-bottom: 4px;
+      background: var(--inset-bg);
+      border: 1px solid transparent;
+      position: relative;
+    }
+
+    .prompt-item:hover {
+      background: #e0e0ff;
+    }
+
+    .prompt-item.selected {
+      background: var(--title-bar);
+      color: var(--title-text);
+    }
+
+    .prompt-item.pinned {
+      border-left: 3px solid var(--title-bar);
+    }
+
+    .prompt-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .pin-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 2px;
+      color: var(--border-dark);
+      line-height: 1;
+    }
+
+    .pin-btn.pinned {
+      color: var(--title-bar);
+    }
+
+    .prompt-item.selected .pin-btn {
+      color: var(--title-text);
+    }
+
+    .prompt-item.selected .pin-btn.pinned {
+      color: #ffd700;
+    }
+
+    .editor-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .form-row label {
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    .form-row input,
+    .form-row textarea,
+    .form-row select {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      padding: 4px;
+      outline: none;
+    }
+
+    .form-row input:focus,
+    .form-row textarea:focus,
+    .form-row select:focus {
+      outline: 1px dotted var(--border-dark);
+    }
+
+    .form-row textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+
+    .locked-box {
+      background: var(--locked-bg);
+      padding: 8px;
+      font-style: italic;
+      color: #555;
+    }
+
+    .preview-box {
+      background: #000000;
+      color: #00ff00;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      min-height: 180px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .preview-stats {
+      display: flex;
+      justify-content: flex-end;
+      gap: 16px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--border-dark);
+      padding: 4px 0;
+    }
+
+    .preview-stats span {
+      background: var(--bg);
+      padding: 2px 8px;
+      border: 1px solid var(--border-dark);
+    }
+
+    .section-title {
+      font-weight: bold;
+      border-bottom: 1px solid var(--border-dark);
+      padding-bottom: 2px;
+      margin-top: 8px;
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 8px;
+      background: var(--bg);
+      border-top: 1px solid var(--border-light);
+      font-size: 12px;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--bg);
+      border-top: 2px solid var(--border-light);
+      border-left: 2px solid var(--border-light);
+      border-right: 2px solid var(--border-dark);
+      border-bottom: 2px solid var(--border-dark);
+      min-width: 320px;
+      max-width: 500px;
+    }
+
+    .modal-title {
+      background: var(--title-bar);
+      color: var(--title-text);
+      padding: 4px 8px;
+      font-weight: bold;
+    }
+
+    .modal-body {
+      padding: 16px;
+    }
+
+    .modal-footer {
+      padding: 8px 16px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      border-top: 1px solid var(--border-dark);
+    }
+
+    .template-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .template-card {
+      padding: 12px;
+      text-align: center;
+      cursor: pointer;
+      background: var(--bg);
+      border-top: 2px solid var(--border-light);
+      border-left: 2px solid var(--border-light);
+      border-right: 2px solid var(--border-dark);
+      border-bottom: 2px solid var(--border-dark);
+    }
+
+    .template-card:hover {
+      background: var(--btn-face);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--border-dark);
+      font-style: italic;
+    }
+
+    .empty-state .empty-action {
+      margin-top: 12px;
+    }
+
+    .var-grid {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .var-grid label {
+      font-size: 12px;
+    }
+
+    .var-grid input {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      padding: 3px;
+    }
+
+    .search-row {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+
+    .search-row input {
+      flex: 1;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 3px 6px;
+    }
+
+    ::-webkit-scrollbar {
+      width: 12px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--btn-face);
+      border: 1px solid var(--border-dark);
+    }
+  </style>
 </head>
 <body>
   <div id="app">
-    <!-- Title Bar -->
     <div class="title-bar">
       <span>PromptKadyan v1.0</span>
       <div style="display:flex;align-items:center;gap:8px;">
@@ -26,7 +555,6 @@
       </div>
     </div>
 
-    <!-- Menu Bar -->
     <div class="menu-bar">
       <div class="menu-item">
         File
@@ -57,9 +585,7 @@
       </div>
     </div>
 
-    <!-- Main Layout -->
     <div class="main-layout">
-      <!-- Sidebar -->
       <div class="sidebar">
         <div class="sidebar-title">CATEGORIES</div>
         <button class="cat-btn active" data-cat="all" onclick="app.filterCategory('all')">All Prompts</button>
@@ -68,7 +594,6 @@
         <button class="cat-btn" data-cat="Programming" onclick="app.filterCategory('Programming')">💻 Programming</button>
       </div>
 
-      <!-- Workspace -->
       <div class="workspace">
         <div class="toolbar">
           <button class="btn" onclick="app.newPrompt()">New Prompt</button>
@@ -78,15 +603,17 @@
         </div>
 
         <div class="content-area">
-          <!-- Prompt List -->
           <div class="prompt-list-panel outset">
             <div class="panel-label">Saved Prompts</div>
+            <div class="search-row">
+              <input type="text" id="searchInput" class="inset" placeholder="Search prompts...">
+              <button class="btn" onclick="app.clearSearch()" style="padding:2px 8px;font-size:11px;">Clear</button>
+            </div>
             <div class="prompt-list inset" id="promptList">
               <div class="empty-state">No prompts yet.<br>Create one to get started.</div>
             </div>
           </div>
 
-          <!-- Editor -->
           <div class="editor-panel" id="editorPanel">
             <div class="empty-state" id="editorEmpty">Select a prompt or create a new one to begin.</div>
 
@@ -135,6 +662,7 @@
               <div class="form-row">
                 <div class="section-title">Live Preview</div>
                 <div id="previewBox" class="preview-box"></div>
+                <div class="preview-stats" id="previewStats"></div>
               </div>
 
               <div class="toolbar" style="margin-top:8px;">
@@ -149,14 +677,12 @@
       </div>
     </div>
 
-    <!-- Status Bar -->
     <div class="status-bar">
       <span id="statusLeft">Ready</span>
       <span id="statusRight">0 prompts saved</span>
     </div>
   </div>
 
-  <!-- Template Picker Modal -->
   <div class="modal-overlay" id="templateModal">
     <div class="modal-box">
       <div class="modal-title">Choose a Template</div>
@@ -169,7 +695,6 @@
     </div>
   </div>
 
-  <!-- Import Modal -->
   <div class="modal-overlay" id="importModal">
     <div class="modal-box">
       <div class="modal-title">Import Database</div>
@@ -184,7 +709,6 @@
     </div>
   </div>
 
-  <!-- About Modal -->
   <div class="modal-overlay" id="aboutModal">
     <div class="modal-box">
       <div class="modal-title">About PromptKadyan</div>
@@ -210,8 +734,529 @@
     </div>
   </div>
 
-  <script src="js/db.js"></script>
-  <script src="js/templates.js"></script>
-  <script src="js/app.js"></script>
+  <script>
+    const INTERVIEW_CLAUSE = `---
+CONFIDENCE GATE:
+Interview me until you are 95% confident you understand my goal, context, and desired output before we proceed. Ask one concise question at a time.`;
+
+    const DEFAULT_TEMPLATES = [
+      {
+        id: "tpl-school-001",
+        title: "Essay Outline Helper",
+        category: "School",
+        goal: "Help me create a structured outline for an essay.",
+        outputSpec: "Bullet-point outline with introduction, 3 main arguments, and conclusion.",
+        variables: { topic: "", wordCount: "", audience: "" },
+        customNotes: "",
+        body: ""
+      },
+      {
+        id: "tpl-paper-001",
+        title: "Professional Email Generator",
+        category: "Paperworks",
+        goal: "Write a clear, professional email.",
+        outputSpec: "Full email body with subject line suggestion.",
+        variables: { recipient: "", purpose: "", tone: "", deadline: "" },
+        customNotes: "",
+        body: ""
+      },
+      {
+        id: "tpl-code-001",
+        title: "Code Explainer & Refactorer",
+        category: "Programming",
+        goal: "Explain and improve a piece of code.",
+        outputSpec: "Explanation + refactored code with comments.",
+        variables: { language: "", codeSnippet: "", focus: "" },
+        customNotes: "",
+        body: ""
+      }
+    ];
+
+    const db = new Dexie("PromptKadyanDB");
+    db.version(1).stores({
+      prompts: "++id, category, title, createdAt",
+      templates: "id, category, title",
+      meta: "key"
+    });
+
+    const app = {
+      currentPromptId: null,
+      currentFilter: "all",
+      currentTemplate: null,
+      promptsCache: [],
+      searchQuery: "",
+
+      async init() {
+        await this.seedTemplates();
+        await this.loadPrompts();
+        this.bindPromptListEvents();
+        this.bindEditorEvents();
+        this.bindSearchEvents();
+        this.updateStatus();
+      },
+
+      async seedTemplates() {
+        const count = await db.templates.count();
+        if (count === 0) {
+          await db.templates.bulkAdd(DEFAULT_TEMPLATES);
+        }
+        await db.meta.put({ key: "schemaVersion", value: "promptkadyan-schema-v1" });
+      },
+
+      async loadPrompts() {
+        let query;
+        if (this.currentFilter === "all") {
+          query = db.prompts.orderBy("createdAt").reverse();
+        } else {
+          query = db.prompts.where("category").equals(this.currentFilter);
+        }
+        this.promptsCache = await query.toArray();
+        // Sort: pinned first, then by createdAt descending
+        this.promptsCache.sort((a, b) => {
+          if (a.pinned && !b.pinned) return -1;
+          if (!a.pinned && b.pinned) return 1;
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+        this.applySearch();
+      },
+
+      applySearch() {
+        const list = document.getElementById("promptList");
+        const term = this.searchQuery.trim().toLowerCase();
+        let filtered = this.promptsCache;
+        if (term) {
+          filtered = this.promptsCache.filter(p =>
+            (p.title || "").toLowerCase().includes(term)
+          );
+        }
+        this.renderPromptList(filtered);
+      },
+
+      renderPromptList(promptsToRender) {
+        const list = document.getElementById("promptList");
+        const prompts = promptsToRender || this.promptsCache;
+        if (prompts.length === 0) {
+          const catLabel = this.currentFilter === "all" ? "" : ` in "${this.currentFilter}"`;
+          const searchLabel = this.searchQuery ? ` matching "${this.escapeHtml(this.searchQuery)}"` : "";
+          list.innerHTML = `
+            <div class="empty-state">
+              No prompts found${catLabel}${searchLabel}.<br>
+              <div class="empty-action">
+                <button class="btn" onclick="app.newPrompt()">Create One</button>
+              </div>
+            </div>`;
+          return;
+        }
+        list.innerHTML = prompts.map(p => `
+          <div class="prompt-item ${p.id === this.currentPromptId ? 'selected' : ''} ${p.pinned ? 'pinned' : ''}" data-id="${p.id}">
+            <div class="prompt-item-header">
+              <div style="font-weight:bold;">${this.escapeHtml(p.title || "Untitled")}</div>
+              <button class="pin-btn ${p.pinned ? 'pinned' : ''}" data-pin-id="${p.id}" title="${p.pinned ? 'Unpin' : 'Pin'} prompt">${p.pinned ? '&#9733;' : '&#9734;'}</button>
+            </div>
+            <div style="font-size:11px;opacity:0.7;">${p.category} | ${new Date(p.createdAt).toLocaleDateString()}</div>
+          </div>
+        `).join("");
+      },
+
+      bindPromptListEvents() {
+        const list = document.getElementById("promptList");
+        list.addEventListener("click", (e) => {
+          // Handle pin button clicks first
+          const pinBtn = e.target.closest(".pin-btn");
+          if (pinBtn) {
+            e.stopPropagation();
+            const rawId = pinBtn.dataset.pinId;
+            if (rawId) {
+              const id = Number(rawId);
+              this.togglePin(id);
+            }
+            return;
+          }
+          // Handle prompt item selection
+          const item = e.target.closest(".prompt-item");
+          if (!item) return;
+          const rawId = item.dataset.id;
+          if (!rawId) return;
+          const id = Number(rawId);
+          this.selectPrompt(id);
+        });
+      },
+
+      bindSearchEvents() {
+        const searchInput = document.getElementById("searchInput");
+        searchInput.addEventListener("input", (e) => {
+          this.searchQuery = e.target.value;
+          this.applySearch();
+        });
+      },
+
+      clearSearch() {
+        this.searchQuery = "";
+        document.getElementById("searchInput").value = "";
+        this.applySearch();
+      },
+
+      async togglePin(id) {
+        const prompt = await db.prompts.get(id);
+        if (!prompt) return;
+        const newPinned = !prompt.pinned;
+        await db.prompts.update(id, { pinned: newPinned });
+        await this.loadPrompts();
+        this.updateStatus(newPinned ? "Prompt pinned" : "Prompt unpinned");
+      },
+
+      filterCategory(cat) {
+        this.currentFilter = cat;
+        document.querySelectorAll(".cat-btn").forEach(btn => {
+          btn.classList.toggle("active", btn.dataset.cat === cat);
+        });
+        this.loadPrompts();
+      },
+
+      async selectPrompt(id) {
+        this.currentPromptId = id;
+        this.currentTemplate = null;
+        const prompt = await db.prompts.get(id);
+        if (!prompt) return;
+        this.renderEditor(prompt);
+        this.applySearch();
+      },
+
+      newPrompt() {
+        this.currentPromptId = null;
+        this.currentTemplate = null;
+        document.getElementById("editorEmpty").classList.add("hidden");
+        document.getElementById("editorForm").classList.remove("hidden");
+        document.getElementById("varSection").classList.add("hidden");
+        this.clearEditor();
+        this.updatePreview();
+        this.updateStatus("New blank prompt");
+      },
+
+      async newFromTemplate() {
+        const templates = await db.templates.toArray();
+        const grid = document.getElementById("templateGrid");
+        grid.innerHTML = templates.map(t => `
+          <div class="template-card" onclick="app.useTemplate('${t.id}')">
+            <div style="font-weight:bold;">${this.escapeHtml(t.title)}</div>
+            <div style="font-size:11px;margin-top:4px;">${t.category}</div>
+          </div>
+        `).join("");
+        document.getElementById("templateModal").classList.add("show");
+      },
+
+      closeTemplateModal() {
+        document.getElementById("templateModal").classList.remove("show");
+      },
+
+      async useTemplate(tplId) {
+        const tpl = await db.templates.get(tplId);
+        if (!tpl) return;
+        this.currentTemplate = tpl;
+        this.currentPromptId = null;
+        this.closeTemplateModal();
+        document.getElementById("editorEmpty").classList.add("hidden");
+        document.getElementById("editorForm").classList.remove("hidden");
+        this.clearEditor();
+        document.getElementById("pTitle").value = tpl.title;
+        document.getElementById("pCategory").value = tpl.category;
+        document.getElementById("pGoal").value = tpl.goal || "";
+        document.getElementById("pOutput").value = tpl.outputSpec || "";
+        document.getElementById("pNotes").value = tpl.customNotes || "";
+        this.renderVariableInputs(tpl.variables);
+        this.updatePreview();
+        this.updateStatus("Using template: " + tpl.title);
+      },
+
+      renderVariableInputs(variables) {
+        const container = document.getElementById("varContainer");
+        const section = document.getElementById("varSection");
+        if (!variables || Object.keys(variables).length === 0) {
+          section.classList.add("hidden");
+          return;
+        }
+        section.classList.remove("hidden");
+        container.innerHTML = Object.entries(variables).map(([key, val]) => `
+          <label>${this.escapeHtml(key)}:</label>
+          <input type="text" class="inset var-input" data-var="${key}" value="${this.escapeHtml(val || "")}">
+        `).join("");
+
+        container.querySelectorAll(".var-input").forEach(input => {
+          input.addEventListener("input", () => this.updatePreview());
+        });
+      },
+
+      clearEditor() {
+        document.getElementById("pTitle").value = "";
+        document.getElementById("pCategory").value = "School";
+        document.getElementById("pGoal").value = "";
+        document.getElementById("pOutput").value = "";
+        document.getElementById("pNotes").value = "";
+        document.getElementById("varContainer").innerHTML = "";
+        document.getElementById("previewBox").textContent = "";
+        document.getElementById("previewStats").innerHTML = "";
+      },
+
+      renderEditor(prompt) {
+        document.getElementById("editorEmpty").classList.add("hidden");
+        document.getElementById("editorForm").classList.remove("hidden");
+        document.getElementById("varSection").classList.add("hidden");
+        document.getElementById("pTitle").value = prompt.title || "";
+        document.getElementById("pCategory").value = prompt.category || "School";
+        document.getElementById("pGoal").value = prompt.goal || "";
+        document.getElementById("pOutput").value = prompt.outputSpec || "";
+        document.getElementById("pNotes").value = prompt.customNotes || "";
+        this.updatePreview();
+      },
+
+      bindEditorEvents() {
+        ["pTitle", "pCategory", "pGoal", "pOutput", "pNotes"].forEach(id => {
+          document.getElementById(id).addEventListener("input", () => this.updatePreview());
+        });
+      },
+
+      collectVariables() {
+        const vars = {};
+        document.querySelectorAll(".var-input").forEach(input => {
+          vars[input.dataset.var] = input.value;
+        });
+        return vars;
+      },
+
+      buildBody() {
+        const title = document.getElementById("pTitle").value.trim() || "Untitled Prompt";
+        const category = document.getElementById("pCategory").value;
+        const goal = document.getElementById("pGoal").value.trim();
+        const output = document.getElementById("pOutput").value.trim();
+        const notes = document.getElementById("pNotes").value.trim();
+        const variables = this.collectVariables();
+
+        let body = `TITLE: ${title}\nCATEGORY: ${category}\n\n`;
+        body += `=== GOAL ===\n${goal || "(No goal specified)"}\n\n`;
+
+        if (variables && Object.keys(variables).length > 0) {
+          body += `=== CONTEXT / VARIABLES ===\n`;
+          Object.entries(variables).forEach(([k, v]) => {
+            body += `${k}: ${v || "(not specified)"}\n`;
+          });
+          body += `\n`;
+        }
+
+        body += `=== OUTPUT SPECIFICATION ===\n${output || "(No output specification)"}\n\n`;
+
+        if (notes) {
+          body += `=== CUSTOM NOTES ===\n${notes}\n\n`;
+        }
+
+        body += `=== ${INTERVIEW_CLAUSE} ===`;
+        return body;
+      },
+
+      updatePreview() {
+        const body = this.buildBody();
+        document.getElementById("previewBox").textContent = body;
+        this.updateStats(body);
+      },
+
+      updateStats(text) {
+        const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+        const chars = text.length;
+        const tokens = Math.ceil(words / 0.75);
+        document.getElementById("previewStats").innerHTML = `
+          <span>Words: ${words}</span>
+          <span>Chars: ${chars}</span>
+          <span>Tokens (approx): ${tokens}</span>
+        `;
+      },
+
+      async savePrompt() {
+        const title = document.getElementById("pTitle").value.trim() || "Untitled Prompt";
+        const category = document.getElementById("pCategory").value;
+        const goal = document.getElementById("pGoal").value.trim();
+        const outputSpec = document.getElementById("pOutput").value.trim();
+        const customNotes = document.getElementById("pNotes").value.trim();
+        const variables = this.collectVariables();
+        const body = this.buildBody();
+
+        const now = new Date().toISOString();
+        const record = {
+          title,
+          category,
+          goal,
+          outputSpec,
+          variables,
+          customNotes,
+          body,
+          interviewClauseLocked: true,
+          updatedAt: now
+        };
+
+        if (this.currentPromptId) {
+          await db.prompts.update(this.currentPromptId, record);
+          this.updateStatus(`Updated: ${title}`);
+        } else {
+          record.createdAt = now;
+          record.pinned = false;
+          const id = await db.prompts.add(record);
+          this.currentPromptId = id;
+          this.updateStatus(`Saved: ${title}`);
+        }
+
+        await this.loadPrompts();
+      },
+
+      async duplicatePrompt() {
+        if (!this.currentPromptId) return;
+        const original = await db.prompts.get(this.currentPromptId);
+        if (!original) return;
+        const now = new Date().toISOString();
+        const copy = {
+          ...original,
+          id: undefined,
+          title: original.title + " (Copy)",
+          pinned: false,
+          createdAt: now,
+          updatedAt: now
+        };
+        const id = await db.prompts.add(copy);
+        this.currentPromptId = id;
+        await this.loadPrompts();
+        this.updateStatus("Duplicated prompt");
+      },
+
+      async deletePrompt() {
+        if (!this.currentPromptId) return;
+        if (!confirm("Are you sure you want to delete this prompt?")) return;
+        await db.prompts.delete(this.currentPromptId);
+        this.currentPromptId = null;
+        document.getElementById("editorForm").classList.add("hidden");
+        document.getElementById("editorEmpty").classList.remove("hidden");
+        await this.loadPrompts();
+        this.updateStatus("Prompt deleted");
+      },
+
+      async copyToClipboard() {
+        const body = this.buildBody();
+        try {
+          await navigator.clipboard.writeText(body);
+          this.updateStatus("Copied to clipboard");
+        } catch (e) {
+          this.updateStatus("Clipboard failed — copy manually from preview");
+        }
+      },
+
+      async exportDB() {
+        const prompts = await db.prompts.toArray();
+        const templates = await db.templates.toArray();
+        const meta = await db.meta.toArray();
+        const exportData = {
+          schemaVersion: "promptkadyan-schema-v1",
+          exportedAt: new Date().toISOString(),
+          appName: "PromptKadyan",
+          prompts,
+          templates,
+          meta
+        };
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `promptkadyan-backup-${new Date().toISOString().split("T")[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.updateStatus("Database exported");
+      },
+
+      importDB() {
+        document.getElementById("importModal").classList.add("show");
+      },
+
+      closeImportModal() {
+        document.getElementById("importModal").classList.remove("show");
+        document.getElementById("importFile").value = "";
+      },
+
+      async confirmImport() {
+        const fileInput = document.getElementById("importFile");
+        if (!fileInput.files.length) return;
+        const file = fileInput.files[0];
+        const text = await file.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          alert("Invalid JSON file.");
+          return;
+        }
+        if (!data.schemaVersion || !data.prompts) {
+          alert("Invalid PromptKadyan database file.");
+          return;
+        }
+
+        if (data.prompts && data.prompts.length > 0) {
+          for (const p of data.prompts) {
+            if (p.id) {
+              const existing = await db.prompts.get(p.id);
+              if (existing) {
+                const action = confirm(`Prompt "${p.title}" already exists. Click OK to overwrite, Cancel to skip.`);
+                if (action) await db.prompts.put(p);
+              } else {
+                await db.prompts.add(p);
+              }
+            } else {
+              await db.prompts.add(p);
+            }
+          }
+        }
+
+        if (data.templates && data.templates.length > 0) {
+          for (const t of data.templates) {
+            const existing = await db.templates.get(t.id);
+            if (existing) {
+              await db.templates.update(t.id, t);
+            } else {
+              await db.templates.add(t);
+            }
+          }
+        }
+
+        this.closeImportModal();
+        await this.loadPrompts();
+        this.updateStatus("Database imported successfully");
+      },
+
+      showAbout() {
+        document.getElementById("aboutModal").classList.add("show");
+      },
+
+      closeAboutModal() {
+        document.getElementById("aboutModal").classList.remove("show");
+      },
+
+      exitApp() {
+        if (confirm("Close PromptKadyan? Unsaved changes may be lost.")) {
+          window.close();
+        }
+      },
+
+      updateStatus(msg) {
+        const left = msg || "Ready";
+        const count = this.promptsCache.length;
+        document.getElementById("statusLeft").textContent = left;
+        document.getElementById("statusRight").textContent = `${count} prompt${count !== 1 ? "s" : ""} saved`;
+      },
+
+      escapeHtml(str) {
+        if (!str) return "";
+        return str
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+    };
+
+    window.addEventListener("DOMContentLoaded", () => app.init());
+  </script>
 </body>
 </html>
